@@ -514,6 +514,17 @@ export default function TailorApp() {
                     {copied === "bullets" ? "Copied" : "Copy"}
                   </button>
                 </div>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--muted)",
+                    margin: "0 0 10px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Copy these into your actual resume file, replacing the matching bullets under
+                  that job — this tool doesn't edit your resume document for you.
+                </p>
                 <ul style={{ margin: 0, paddingLeft: "18px" }}>
                   {result.tailoredBullets.map((b, i) => (
                     <li key={i} style={{ fontSize: "13.5px", lineHeight: 1.6, marginBottom: "6px", color: "var(--graphite)" }}>
