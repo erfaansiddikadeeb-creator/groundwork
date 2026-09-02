@@ -1,0 +1,91 @@
+:root {
+  --ink: #14213D;
+  --paper: #F2F4F1;
+  --white: #FFFFFF;
+  --blue: #2F6FED;
+  --blue-dim: #E8EEFD;
+  --amber: #E2A63B;
+  --amber-dim: #FBF1DF;
+  --green: #2F9E6E;
+  --green-dim: #E7F5EE;
+  --red: #D64545;
+  --red-dim: #FBEAEA;
+  --graphite: #1D2130;
+  --muted: #5B6472;
+  --line: #D7DCE3;
+  --line-soft: #E7EAEE;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+.font-body {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(20, 33, 61, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 33, 61, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.grid-bg-dark {
+  background-image:
+    linear-gradient(to right, rgba(242, 244, 241, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(242, 244, 241, 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Blueprint corner-bracket registration marks — the signature motif */
+.bracket-panel {
+  position: relative;
+}
+.bracket-panel::before,
+.bracket-panel::after,
+.bracket-panel > .bracket-tl,
+.bracket-panel > .bracket-tr {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.bracket-panel::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--blue);
+  border-left: 2px solid var(--blue);
+}
+.bracket-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--blue);
+  border-right: 2px solid var(--blue);
+}
+
+button, a {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.primary-btn {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.primary-btn:hover:not(:disabled) {
+  background: #2559C7;
+  transform: translateY(-1px);
+}
+.primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
