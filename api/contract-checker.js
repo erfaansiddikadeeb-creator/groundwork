@@ -9,7 +9,22 @@ You may receive the contract as plain text, or as a photo/scan of a physical doc
 Given the contract, you:
 1. Write a plain-English summary (3-5 sentences) of what this contract actually commits the person to.
 2. Identify the 4-8 most important clauses (payment terms, termination, IP ownership, non-compete, liability, confidentiality, auto-renewal, etc — whichever are actually present) and explain each in one plain sentence.
-3. Flag specific clauses that are worth a second look — unusual, one-sided, vague, or commonly problematic terms (e.g. broad IP assignment, unlimited liability, auto-renewal with short cancellation windows, unusually long non-competes, unclear payment timelines). For each flag, give a severity ("low", "medium", "high") and a plain-English reason. Do not invent flags if the contract is genuinely standard — an empty or short list is a valid, honest result.
+3. Flag specific clauses that are worth a second look — unusual, one-sided, vague, or commonly problematic terms. Do not invent flags if the contract is genuinely standard — an empty or short list is a valid, honest result, and do not force a flag from a category below if that category isn't actually relevant to this specific contract.
+
+   First, identify what TYPE of contract this is (freelance/service agreement, employment offer, NDA, lease, sale/purchase agreement, etc), since that determines which categories below are actually relevant — don't hunt for a non-compete clause in a lease, or a security deposit clause in an NDA.
+
+   One category applies almost universally and should ALWAYS be checked regardless of contract type, because it's the single most common way a non-lawyer gets seriously hurt and it's often buried in dense boilerplate that's easy to skim past:
+   - Liability / indemnification / damages: is the person on the hook for the other party's costs, damages, or legal fees, with no dollar cap or an open-ended/"unlimited" scope? Uncapped liability is almost always a HIGH severity flag on its own, regardless of how standard the rest of the contract looks.
+
+   Beyond that, check whichever of these are actually present and relevant to this contract's type:
+   - Payment/money terms: vague amounts, discretionary withholding, unclear timing, hidden fees, security deposits with unclear return conditions.
+   - Term & renewal: auto-renewal, how much notice is required to cancel and by what method, early-termination penalties.
+   - Termination: is it symmetric between both parties, or can one side exit far more easily/quickly than the other?
+   - Rights/ownership: for creative or service work, does it grab pre-existing IP, moral rights, or work outside the engagement's scope? For a lease, are there unusual restrictions on the tenant's normal use of the space?
+   - Restrictive covenants: non-compete/non-solicit scope — how long, how broad geographically, how broad in terms of what's restricted — where applicable (mainly employment/freelance contracts).
+   - Anything else genuinely unusual for this specific type of contract, even if it doesn't fit a category above.
+
+   For each flag, give a severity ("low", "medium", "high") and a plain-English reason, reflecting real-world financial/legal risk to the person signing.
 4. Give an overall "fairness read" (1-2 sentences) — an honest, balanced take on whether this leans standard/fair or unusually one-sided, without being alarmist.
 
 Always include a brief closing reminder that this is not legal advice and a lawyer should review anything significant before signing — but keep it to one sentence, don't be repetitive about it.
@@ -125,7 +140,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.4,
+        temperature: 0.25,
         max_tokens: 1200,
         response_format: { type: "json_object" },
         messages: [
