@@ -8,8 +8,8 @@ You may receive the contract as plain text, or as a photo/scan of a physical doc
 
 Given the contract, you:
 1. Write a plain-English summary (3-5 sentences) of what this contract actually commits the person to.
-2. Identify the 4-8 most important clauses (payment terms, termination, IP ownership, non-compete, liability, confidentiality, auto-renewal, etc — whichever are actually present) and explain each in one plain sentence.
-3. Flag specific clauses that are worth a second look — unusual, one-sided, vague, or commonly problematic terms. Do not invent flags if the contract is genuinely standard — an empty or short list is a valid, honest result, and do not force a flag from a category below if that category isn't actually relevant to this specific contract.
+2. Identify every substantively distinct clause in the document (payment terms, termination, IP ownership, non-compete, liability, confidentiality, auto-renewal, subletting/assignment, entry/access, maintenance, etc — whichever are actually present) and explain each in one plain sentence. Cover ALL of them — do not silently drop a clause just to keep the list short. For a short contract this might be 4-5 items; for a longer multi-page contract with many distinct sections, list all of them, up to about 20. If the document genuinely has more than 20 distinct clauses, cover the 20 most substantive ones and note in the summary that a few minor/boilerplate clauses were omitted for length.
+3. Flag specific clauses that are worth a second look — unusual, one-sided, vague, or commonly problematic terms. Do not invent flags if the contract is genuinely standard — an empty or short list is a valid, honest result, and do not force a flag from a category below if that category isn't actually relevant to this specific contract. When a clause stacks multiple consequences together (e.g. "pay remaining rent AND a separate penalty fee"), capture ALL of the stacked consequences in your explanation, not just the first one — leaving out the second penalty understates the real risk.
 
    First, identify what TYPE of contract this is (freelance/service agreement, employment offer, NDA, lease, sale/purchase agreement, etc), since that determines which categories below are actually relevant — don't hunt for a non-compete clause in a lease, or a security deposit clause in an NDA.
 
@@ -32,7 +32,7 @@ Always include a brief closing reminder that this is not legal advice and a lawy
 Respond with ONLY valid JSON, no markdown fences, no preamble, in this exact shape:
 {
   "summary": "<string>",
-  "keyClauses": [{"title": "<string>", "explanation": "<string>"}, ...4-8 items],
+  "keyClauses": [{"title": "<string>", "explanation": "<string>"}, ...one per distinct clause, up to about 20],
   "flags": [{"clause": "<string>", "severity": "low"|"medium"|"high", "reason": "<string>"}, ...0-8 items],
   "fairnessRead": "<string>"
 }`;
@@ -141,7 +141,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.25,
-        max_tokens: 1200,
+        max_tokens: 2400,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
@@ -158,7 +158,21 @@ export default async function handler(req, res) {
 
     const data = await openaiRes.json();
     const raw = data.choices?.[0]?.message?.content || "{}";
-    const parsed = JSON.parse(raw);
+    const finishReason = data.choices?.[0]?.finish_reason;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (parseErr) {
+      if (finishReason === "length") {
+        res.status(502).json({
+          error: "That contract was long enough that the analysis got cut off. Try checking fewer pages at once.",
+        });
+      } else {
+        res.status(502).json({ error: "Couldn't process that response. Try again." });
+      }
+      return;
+    }
     res.status(200).json(parsed);
   } catch (err) {
     res.status(500).json({ error: "Server error", detail: String(err) });
