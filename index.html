@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Groundwork — free tools for the paperwork of life</title>
+    <meta name="description" content="Free tools for resumes, contracts, and the other paperwork of life. Get an ATS match score and tailored resume bullets, or a plain-English contract breakdown — no signup, no paywall." />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Groundwork — free tools for the paperwork of life" />
+    <meta property="og:description" content="Free tools for resumes, contracts, and the other paperwork of life. No signup, no paywall." />
+    <meta property="og:site_name" content="Groundwork" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Groundwork — free tools for the paperwork of life" />
+    <meta name="twitter:description" content="Free tools for resumes, contracts, and the other paperwork of life. No signup, no paywall." />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html, body, #root { margin: 0; padding: 0; min-height: 100%; background: #FAFAF9; }
+      html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root { background: #191919; }
+      * { box-sizing: border-box; }
+    </style>
+    <script>
+      // Runs before React mounts, so returning dark-mode visitors don't see
+      // a flash of the light theme while the page loads.
+      (function () {
+        try {
+          var saved = localStorage.getItem("groundwork:theme");
+          var theme = saved === "dark" || saved === "light"
+            ? saved
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
