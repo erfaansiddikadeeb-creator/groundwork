@@ -409,6 +409,14 @@ export default function ImageConverter() {
   const [presetKey, setPresetKey] = useState("original");
   const [keepFullRes, setKeepFullRes] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
+  // When set, Custom mode behaves exactly like a preset with these typed
+  // pixel dimensions: `crop` holds the MAXIMAL region matching that shape,
+  // and the final output gets scaled down to this exact size — same as
+  // clicking "Landscape" etc. It's cleared the moment the user drags the
+  // crop box by hand, at which point Custom reverts to a literal pixel
+  // selection (crop size = output size, no scaling), matching manual intent.
+  const [customResizeTarget, setCustomResizeTarget] = useState(null);
   const [beforeUrl, setBeforeUrl] = useState(null);
   const [beforeSize, setBeforeSize] = useState("");
   const [afterUrl, setAfterUrl] = useState(null);
@@ -444,6 +452,9 @@ export default function ImageConverter() {
         if (typeof saved.quality === "number") setQuality(saved.quality);
         if (saved.presetKey) setPresetKey(saved.presetKey);
         if (typeof saved.keepFullRes === "boolean") setKeepFullRes(saved.keepFullRes);
+        if (saved.customResizeTarget && saved.customResizeTarget.width && saved.customResizeTarget.height) {
+          setCustomResizeTarget(saved.customResizeTarget);
+        }
       }
     } catch (e) {
       // localStorage unavailable — just proceed with the defaults.
@@ -455,11 +466,11 @@ export default function ImageConverter() {
   useEffect(() => {
     if (!settingsLoaded.current) return; // don't overwrite saved settings with defaults before the restore above runs
     try {
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ format, quality, presetKey, keepFullRes }));
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ format, quality, presetKey, keepFullRes, customResizeTarget }));
     } catch (e) {
       // localStorage unavailable — settings just won't persist this session.
     }
-  }, [format, quality, presetKey, keepFullRes]);
+  }, [format, quality, presetKey, keepFullRes, customResizeTarget]);
 
   const runConversion = useCallback((sourceCanvas, fmt, q, cropRect, originalSize, targetDims) => {
     if (!sourceCanvas || !cropRect.w || !cropRect.h) return;
@@ -510,26 +521,40 @@ export default function ImageConverter() {
   useEffect(() => {
     if (!canvas || !crop.w || !crop.h) return;
     const preset = PRESETS.find((p) => p.key === presetKey);
-    const targetDims = !keepFullRes && preset && preset.width && preset.height ? { width: preset.width, height: preset.height } : null;
+    let targetDims = null;
+    if (presetKey === "custom") {
+      // Only scale-to-fit when the current crop came from typed numbers
+      // (customResizeTarget set). A manually dragged box is a literal
+      // pixel selection — no scaling — same as it's always been.
+      targetDims = keepFullRes ? null : customResizeTarget;
+    } else if (!keepFullRes && preset && preset.width && preset.height) {
+      targetDims = { width: preset.width, height: preset.height };
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       runConversion(canvas, format, quality, crop, file?.size, targetDims);
     }, 120);
     return () => clearTimeout(debounceRef.current);
-  }, [canvas, format, quality, crop, file, presetKey, keepFullRes, runConversion]);
+  }, [canvas, format, quality, crop, file, presetKey, keepFullRes, customResizeTarget, runConversion]);
 
-  // Keep the draft text boxes in sync whenever the crop rect itself
-  // changes for a reason OTHER than typing — picking a preset, dragging
-  // the on-canvas handles, or a fresh image loading. While the user is
-  // actively typing, `crop` hasn't changed yet, so this never fights them.
+  // Keep the draft text boxes in sync. In Custom mode with a typed target
+  // active, show the TARGET size (what the output will actually be) —
+  // not the much larger maximal-crop region backing it. Otherwise (a
+  // manual drag, or any other preset) show the crop's own pixel size.
   useEffect(() => {
-    setWidthDraft(crop.w ? String(Math.round(crop.w)) : "");
-    setHeightDraft(crop.h ? String(Math.round(crop.h)) : "");
-  }, [crop.w, crop.h]);
+    if (presetKey === "custom" && customResizeTarget) {
+      setWidthDraft(String(customResizeTarget.width));
+      setHeightDraft(String(customResizeTarget.height));
+    } else {
+      setWidthDraft(crop.w ? String(Math.round(crop.w)) : "");
+      setHeightDraft(crop.h ? String(Math.round(crop.h)) : "");
+    }
+  }, [crop.w, crop.h, presetKey, customResizeTarget]);
 
   // Clears everything that depends on the currently-loaded image, but
-  // deliberately leaves format/quality/presetKey alone — those are the
-  // settings a visitor may have already picked before uploading anything.
+  // deliberately leaves format/quality/presetKey/customResizeTarget alone
+  // — those are the settings a visitor may have already picked before
+  // uploading anything, and should carry over to a newly-loaded photo.
   function resetImageState() {
     setFile(null); setCanvas(null); setSourceLabel(""); setNaturalSize({ w: 0, h: 0 });
     setBeforeUrl(null); setAfterUrl(null); setAfterDims(""); setOutputDims({ w: 0, h: 0 });
@@ -541,6 +566,7 @@ export default function ImageConverter() {
   function resetAll() {
     resetImageState();
     setPresetKey("original"); setFormat("image/jpeg"); setQuality(85); setKeepFullRes(false);
+    setCustomResizeTarget(null);
     setJustCopied(false);
   }
 
@@ -560,7 +586,11 @@ export default function ImageConverter() {
       // uploading, rather than snapping back to "Original".
       const preset = PRESETS.find((p) => p.key === presetKey) || PRESETS[0];
       if (preset.key === "custom") {
-        setCrop({ x: 0, y: 0, w: c.width, h: c.height });
+        if (customResizeTarget) {
+          setCrop(centeredCropForRatio(c.width, c.height, customResizeTarget.width, customResizeTarget.height));
+        } else {
+          setCrop({ x: 0, y: 0, w: c.width, h: c.height });
+        }
       } else {
         setCrop(centeredCropForRatio(c.width, c.height, preset.ratioW, preset.ratioH));
       }
@@ -599,7 +629,16 @@ export default function ImageConverter() {
 
   function choosePreset(preset) {
     setPresetKey(preset.key);
-    if (preset.key !== "custom" && naturalSize.w > 0) {
+    if (naturalSize.w === 0) return;
+    if (preset.key === "custom") {
+      // Re-sync the crop to any already-typed target so the region and
+      // the target ratio can't drift apart (which would distort the
+      // image on export). If nothing's been typed yet, leave the crop
+      // as-is — a literal carryover from whatever was active before.
+      if (customResizeTarget) {
+        setCrop(centeredCropForRatio(naturalSize.w, naturalSize.h, customResizeTarget.width, customResizeTarget.height));
+      }
+    } else {
       setCrop(centeredCropForRatio(naturalSize.w, naturalSize.h, preset.ratioW, preset.ratioH));
     }
   }
@@ -624,7 +663,11 @@ export default function ImageConverter() {
 
     const preset = PRESETS.find((p) => p.key === presetKey) || PRESETS[0];
     if (preset.key === "custom") {
-      setCrop({ x: 0, y: 0, w: newSize.w, h: newSize.h });
+      if (customResizeTarget) {
+        setCrop(centeredCropForRatio(newSize.w, newSize.h, customResizeTarget.width, customResizeTarget.height));
+      } else {
+        setCrop({ x: 0, y: 0, w: newSize.w, h: newSize.h });
+      }
     } else {
       setCrop(centeredCropForRatio(newSize.w, newSize.h, preset.ratioW, preset.ratioH));
     }
@@ -645,28 +688,21 @@ export default function ImageConverter() {
     }
   }
 
-  // Typing a width/height re-centers the box around its CURRENT center,
-  // rather than anchoring to its existing top-left corner. Anchoring to
-  // x/y meant shrinking from a full-image crop (x=0, y=0) always pinned
-  // the new box to the top-left corner — nothing like the centered crop
-  // every preset produces. Re-centering makes typed dimensions behave
-  // the same way a preset does, while still clamping into bounds so a
-  // box near an edge doesn't run off the image.
-  function setWidthPx(v) {
-    const w = clamp(Math.round(v), 24, naturalSize.w);
-    setCrop((c) => {
-      const centerX = c.x + c.w / 2;
-      const x = clamp(Math.round(centerX - w / 2), 0, naturalSize.w - w);
-      return { ...c, x, w };
-    });
-  }
-  function setHeightPx(v) {
-    const h = clamp(Math.round(v), 24, naturalSize.h);
-    setCrop((c) => {
-      const centerY = c.y + c.h / 2;
-      const y = clamp(Math.round(centerY - h / 2), 0, naturalSize.h - h);
-      return { ...c, y, h };
-    });
+  // Typing a width or height sets the TARGET output size — exactly what
+  // clicking a preset does, just with your own numbers. We compute the
+  // maximal centered crop matching that ratio (so the full photo stays in
+  // frame, same as "Landscape" etc.) and the actual shrink-to-size happens
+  // later at export. The current OTHER dimension (whichever wasn't just
+  // typed) comes from customResizeTarget if one's already active, or the
+  // live crop size otherwise — so committing width then height in sequence
+  // converges on the pair you actually typed, not a stale mix.
+  function applyCustomTarget(width, height) {
+    const w = clamp(Math.round(width), 24, naturalSize.w);
+    const h = clamp(Math.round(height), 24, naturalSize.h);
+    setCustomResizeTarget({ width: w, height: h });
+    if (naturalSize.w > 0) {
+      setCrop(centeredCropForRatio(naturalSize.w, naturalSize.h, w, h));
+    }
   }
 
   // Only commit (and clamp) once the user is done typing — on blur or
@@ -674,13 +710,15 @@ export default function ImageConverter() {
   // never gets stomped back to the 24px floor after the first keystroke.
   function commitWidthDraft() {
     const n = parseInt(widthDraft, 10);
-    if (!isNaN(n)) setWidthPx(n);
-    else setWidthDraft(String(Math.round(crop.w)));
+    const currentH = customResizeTarget ? customResizeTarget.height : crop.h;
+    if (!isNaN(n)) applyCustomTarget(n, currentH);
+    else setWidthDraft(String(customResizeTarget ? customResizeTarget.width : Math.round(crop.w)));
   }
   function commitHeightDraft() {
     const n = parseInt(heightDraft, 10);
-    if (!isNaN(n)) setHeightPx(n);
-    else setHeightDraft(String(Math.round(crop.h)));
+    const currentW = customResizeTarget ? customResizeTarget.width : crop.w;
+    if (!isNaN(n)) applyCustomTarget(currentW, n);
+    else setHeightDraft(String(customResizeTarget ? customResizeTarget.height : Math.round(crop.h)));
   }
 
   return (
@@ -828,7 +866,7 @@ export default function ImageConverter() {
                 })}
               </div>
 
-              {presetKey !== "original" && presetKey !== "custom" && (
+              {(presetKey !== "original" && (presetKey !== "custom" || customResizeTarget)) && (
                 <label style={{ display: "flex", alignItems: "center", gap: "7px", marginTop: "12px", fontSize: "12.5px", color: "var(--muted)", cursor: "pointer" }}>
                   <input
                     type="checkbox"
@@ -836,7 +874,10 @@ export default function ImageConverter() {
                     onChange={(e) => setKeepFullRes(e.target.checked)}
                     style={{ accentColor: "var(--blue)" }}
                   />
-                  Keep full resolution — crop to this shape but don't shrink the file down to {PRESETS.find((p) => p.key === presetKey)?.width}×{PRESETS.find((p) => p.key === presetKey)?.height}
+                  {(() => {
+                    const dims = presetKey === "custom" ? customResizeTarget : PRESETS.find((p) => p.key === presetKey);
+                    return `Keep full resolution — crop to this shape but don't shrink the file down to ${dims?.width}×${dims?.height}`;
+                  })()}
                 </label>
               )}
 
@@ -881,7 +922,12 @@ export default function ImageConverter() {
                         naturalW={naturalSize.w}
                         naturalH={naturalSize.h}
                         crop={crop}
-                        onCropChange={setCrop}
+                        onCropChange={(newCrop) => {
+                          // A manual drag is a literal pixel selection —
+                          // it overrides any typed target size.
+                          setCustomResizeTarget(null);
+                          setCrop(newCrop);
+                        }}
                       />
                     )}
                   </div>
